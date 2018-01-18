@@ -8,6 +8,7 @@ import com.android.builder.model.SourceProvider
 import com.android.utils.FileUtils
 import net.koiosmedia.gradle.sevenzip.SevenZip
 import org.codehaus.groovy.runtime.ResourceGroovyMethods
+import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -32,6 +33,7 @@ public class AppCanPlugin implements Plugin<Project> {
     List<String> flavors=new ArrayList<String>()
     static final String BUILD_APPCAN_DIR ="build/appcan"
     public static String version=""
+    public static String buildVersion="01"
 
     @Override
     public void apply(Project project) {
@@ -39,6 +41,7 @@ public class AppCanPlugin implements Plugin<Project> {
         this.mExtension=project.extensions.create(PLUGIN_NAME,AppCanPluginExtension)
         project.afterEvaluate {
             version=getEngineVersion(project)
+            buildVersion=getEngineLocalBuildVersionCode(version)
             androidPlugin=getAndroidBasePlugin(project)
             def variantManager=getVariantManager(androidPlugin)
             processVariantData(variantManager.variantDataList,androidPlugin)
@@ -140,7 +143,8 @@ public class AppCanPlugin implements Plugin<Project> {
     private String getPackageName(String flavor){
         def date = new Date().format("yyMMdd")
         def versionTemp=version
-        return "android_Engine_${versionTemp}_${date}_01_${flavor}"
+        def buildVersionTemp = buildVersion
+        return "android_Engine_${versionTemp}_${date}_${buildVersionTemp}_${flavor}"
     }
 
     /**
@@ -149,7 +153,8 @@ public class AppCanPlugin implements Plugin<Project> {
     private static String getEngineZipVersion(){
         def date = new Date().format("yyMMdd")
         def versionTemp=version.substring(0,version.lastIndexOf("."))
-        return "sdksuit_${versionTemp}_${date}_01"
+        def buildVersionTemp = buildVersion;
+        return "sdksuit_${versionTemp}_${date}_${buildVersionTemp}"
     }
 
     /**
@@ -189,7 +194,7 @@ public class AppCanPlugin implements Plugin<Project> {
         if (m.find()){
             version=m.group(1)
         }
-        println("Engine version is $version")
+        println("AppCanEngine version is $version")
         return version
     }
 
@@ -362,6 +367,37 @@ public class AppCanPlugin implements Plugin<Project> {
             if (tempFile.exists()){
                 FileUtils.deleteDirectoryContents(tempFile)
             }
+        }
+    }
+
+    def getEngineLocalBuildVersionCode(String engineVersion) {
+        def propertiesFileName = 'local-appcanengine-build-versions.properties'
+        def versionPropertiesFile = new File(propertiesFileName)
+        if (!versionPropertiesFile.exists()){
+            println("Local BuildVersion Record file is not found，create it：${propertiesFileName}")
+            versionPropertiesFile.createNewFile();
+        }
+        if (versionPropertiesFile.canRead()) {
+            def Properties versionProps = new Properties()
+            versionPropertiesFile.withInputStream {
+                fileStream -> versionProps.load(fileStream)
+            }
+            def versionCode = 0;
+            def buildVersionCodeStr = versionProps[engineVersion]
+            if (buildVersionCodeStr != null) {
+                versionCode = buildVersionCodeStr.toInteger()
+            }
+            versionProps[engineVersion] = (++versionCode).toString()
+            versionProps.store(versionPropertiesFile.newWriter(), "Output AppCanEngine Increasement Local BuildVersion Record. \nIt is an AUTO-GENERATE file in AppCanEngine's compiling. Please Do NOT modify it manually.")
+            if (versionCode < 10){
+                buildVersionCodeStr = "0${versionCode}"
+            }else{
+                buildVersionCodeStr = versionCode;
+            }
+            println("AppCanEngine buildVersion is ${buildVersionCodeStr}")
+            return buildVersionCodeStr
+        } else {
+            throw GradleException("Cannot find or create ${propertiesFileName}!")
         }
     }
 
