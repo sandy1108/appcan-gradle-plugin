@@ -3,7 +3,6 @@ package com.appcan
 import com.android.build.gradle.BasePlugin
 import com.android.build.gradle.internal.VariantManager
 import com.android.build.gradle.internal.variant.BaseVariantData
-import com.android.build.gradle.internal.variant.BaseVariantOutputData
 import com.android.builder.model.SourceProvider
 import com.android.utils.FileUtils
 import net.koiosmedia.gradle.sevenzip.SevenZip
@@ -252,7 +251,7 @@ public class AppCanPlugin implements Plugin<Project> {
         def proguardTask=project.tasks.create(taskName,ProGuardTask)
         proguardTask.dependsOn(project.tasks.findByName(jarTaskName))
 
-        def androidSDKDir = androidPlugin.sdkHandler.getSdkFolder()
+        def androidSDKDir = androidPlugin.extension.sdkDirectory
 
         def androidJarDir = androidSDKDir.toString() + '/platforms/' + androidPlugin.extension.getCompileSdkVersion() +
                 '/android.jar'
@@ -268,7 +267,7 @@ public class AppCanPlugin implements Plugin<Project> {
     }
 
     private void processVariantData(
-            List<BaseVariantData<? extends BaseVariantOutputData>> variantDataList, BasePlugin androidPlugin) {
+            List<BaseVariantData<? extends BaseVariantData>> variantDataList, BasePlugin androidPlugin) {
 
         variantDataList.each { variantData ->
             def variantDataName = variantData.name
