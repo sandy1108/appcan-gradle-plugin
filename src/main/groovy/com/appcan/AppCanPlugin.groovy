@@ -24,6 +24,7 @@ public class AppCanPlugin implements Plugin<Project> {
 
 
     static final String PLUGIN_NAME = "appcan"
+    static final VERSION_PROPERTIES_FILE_NAME = 'local-appcanengine-build-versions.properties'
     Project mProject;
     AppCanPluginExtension mExtension;
     BasePlugin androidPlugin
@@ -33,6 +34,7 @@ public class AppCanPlugin implements Plugin<Project> {
     static final String BUILD_APPCAN_DIR ="build/appcan"
     public static String version=""
     public static String buildVersion="01"
+    static boolean isVersionUpdated = false //用于标记在本次编译过程中，版本号是否已经+1
 
     @Override
     public void apply(Project project) {
@@ -45,6 +47,7 @@ public class AppCanPlugin implements Plugin<Project> {
             def variantManager=getVariantManager(androidPlugin)
             processVariantData(variantManager.variantDataList,androidPlugin)
 
+            createIncreaseEngineLocalBuildVersionCodeTask()
             variantManager.getProductFlavors().keySet().each { flavor ->
                 createFlavorsJarTask(project,androidPlugin,flavor)
                 createFlavorsProguardTask(project,flavor)
@@ -79,9 +82,19 @@ public class AppCanPlugin implements Plugin<Project> {
      */
     private void createBuildEngineTask(){
         def task=mProject.tasks.create("buildEngine")
+        //增长版本号。preventTask-->flavorTask-->task-->continueTask-->doTask
+        Task preventTask = mProject.tasks.findByName("preventIncreaseEngineLocalBuildVersionCode")
+        task.dependsOn(preventTask)
         flavors.each { flavor->
-            task.dependsOn(mProject.tasks.findByName("build${flavor.capitalize()}Engine"))
+            Task flavorTask = mProject.tasks.findByName("build${flavor.capitalize()}Engine")
+            task.dependsOn(flavorTask)
+            flavorTask.mustRunAfter(preventTask)
         }
+        //任务执行完成的末尾，先放开版本增长的锁，然后提升版本记录，以备下次出包使用
+        Task continueTask = mProject.tasks.findByName("continueIncreaseEngineLocalBuildVersionCode")
+        Task doTask = mProject.tasks.findByName("doIncreaseEngineLocalBuildVersionCode")
+        task.finalizedBy(continueTask, doTask)
+        doTask.mustRunAfter(continueTask)
     }
 
     /**
@@ -134,6 +147,7 @@ public class AppCanPlugin implements Plugin<Project> {
              setXmlContent(new File(project.getProjectDir(),
                     "$BUILD_APPCAN_DIR/${name}/en_baseEngineProject/androidEngine.xml"),name)
         }
+        task.finalizedBy(mProject.tasks.findByName("doIncreaseEngineLocalBuildVersionCode"))
     }
 
     /**
@@ -143,7 +157,9 @@ public class AppCanPlugin implements Plugin<Project> {
         def date = new Date().format("yyMMdd")
         def versionTemp=version
         def buildVersionTemp = buildVersion
-        return "android_Engine_${versionTemp}_${date}_${buildVersionTemp}_${flavor}"
+        def enginePackageName = "android_Engine_${versionTemp}_${date}_${buildVersionTemp}_${flavor}"
+        println("getEnginePackageName: ${enginePackageName}")
+        return enginePackageName
     }
 
     /**
@@ -153,7 +169,9 @@ public class AppCanPlugin implements Plugin<Project> {
         def date = new Date().format("yyMMdd")
         def versionTemp=version.substring(0,version.lastIndexOf("."))
         def buildVersionTemp = buildVersion;
-        return "sdksuit_${versionTemp}_${date}_${buildVersionTemp}"
+        def engineZipVersion = "sdksuit_${versionTemp}_${date}_${buildVersionTemp}"
+        println("getEngineZipVersion: ${engineZipVersion}")
+        return engineZipVersion
     }
 
     /**
@@ -369,35 +387,93 @@ public class AppCanPlugin implements Plugin<Project> {
         }
     }
 
-    def getEngineLocalBuildVersionCode(String engineVersion) {
-        def propertiesFileName = 'local-appcanengine-build-versions.properties'
+    /**
+     *  创建增长本地配置文件记录的版本号的任务
+     **/
+    def createIncreaseEngineLocalBuildVersionCodeTask(){
+        def versionTaskName = "doIncreaseEngineLocalBuildVersionCode"
+        def versionTask = mProject.tasks.create(versionTaskName)
+        versionTask.doLast {
+            increaseEngineLocalBuildVersionCode(version)
+        }
+        mProject.tasks.create("preventIncreaseEngineLocalBuildVersionCode").doLast {
+            isVersionUpdated = true
+            println("preventIncreaseEngineLocalBuildVersionCode")
+        }
+        mProject.tasks.create("continueIncreaseEngineLocalBuildVersionCode").doLast {
+            isVersionUpdated = false
+            println("continueIncreaseEngineLocalBuildVersionCode")
+        }
+    }
+
+    def static getEngineLocalBuildVersionCode(String engineVersion) {
+        def propertiesFileName = VERSION_PROPERTIES_FILE_NAME
         def versionPropertiesFile = new File(propertiesFileName)
         if (!versionPropertiesFile.exists()){
             println("Local BuildVersion Record file is not found，create it：${propertiesFileName}")
             versionPropertiesFile.createNewFile();
         }
         if (versionPropertiesFile.canRead()) {
-            def Properties versionProps = new Properties()
+            Properties versionProps = new Properties()
             versionPropertiesFile.withInputStream {
                 fileStream -> versionProps.load(fileStream)
             }
-            def versionCode = 0;
+            //获取当前配置文件中的build版本号，如果不存在默认为1
+            def versionCode = 1;
             def buildVersionCodeStr = versionProps[engineVersion]
             if (buildVersionCodeStr != null) {
                 versionCode = buildVersionCodeStr.toInteger()
+            }else{
+                //不存在本版本的出包build号，写入当前初始值
+                versionProps[engineVersion] = (versionCode).toString()
+                versionProps.store(versionPropertiesFile.newWriter(), "Output AppCanEngine Increasement Local BuildVersion Record. \nIt is an AUTO-GENERATE file in AppCanEngine's compiling. Please Do NOT modify it manually.")
             }
-            versionProps[engineVersion] = (++versionCode).toString()
-            versionProps.store(versionPropertiesFile.newWriter(), "Output AppCanEngine Increasement Local BuildVersion Record. \nIt is an AUTO-GENERATE file in AppCanEngine's compiling. Please Do NOT modify it manually.")
             if (versionCode < 10){
                 buildVersionCodeStr = "0${versionCode}"
             }else{
                 buildVersionCodeStr = versionCode;
             }
-            println("AppCanEngine buildVersion is ${buildVersionCodeStr}")
+            println("AppCanEngine current buildVersion is ${buildVersionCodeStr}")
             return buildVersionCodeStr
         } else {
             throw GradleException("Cannot find or create ${propertiesFileName}!")
         }
+    }
+
+    /**
+     *  增长本地配置文件记录的版本号
+     **/
+    def static increaseEngineLocalBuildVersionCode(String engineVersion){
+        //判断是否为buildEngine出包（即批量生成所有内核），是则无需再增长版本号，因为已经增长过了
+        if (isVersionUpdated){
+            println("increaseEngineLocalBuildVersionCode is prevented.")
+            return
+        }
+        def propertiesFileName = VERSION_PROPERTIES_FILE_NAME
+        def versionPropertiesFile = new File(propertiesFileName)
+        if (!versionPropertiesFile.exists()){
+            println("Local BuildVersion Record file is not found，create it：${propertiesFileName}")
+            versionPropertiesFile.createNewFile();
+        }
+        Properties versionProps = new Properties()
+        versionPropertiesFile.withInputStream {
+            fileStream -> versionProps.load(fileStream)
+        }
+        //获取当前配置文件中的build版本号，如果不存在默认为0，最后基于此版本号+1并写入配置文件
+        def versionCode = 0;
+        def buildVersionCodeStr = versionProps[engineVersion]
+        if (buildVersionCodeStr != null) {
+            versionCode = buildVersionCodeStr.toInteger()
+        }
+        versionProps[engineVersion] = (++versionCode).toString()
+        versionProps.store(versionPropertiesFile.newWriter(), "Output AppCanEngine Increasement Local BuildVersion Record. \nIt is an AUTO-GENERATE file in AppCanEngine's compiling. Please Do NOT modify it manually.")
+        if (versionCode < 10){
+            buildVersionCodeStr = "0${versionCode}"
+        }else{
+            buildVersionCodeStr = versionCode;
+        }
+        buildVersion = buildVersionCodeStr
+        println("AppCanEngine buildVersion is increased to ${buildVersionCodeStr}")
     }
 
 }
