@@ -52,6 +52,7 @@ public class AppCanPlugin implements Plugin<Project> {
                 createFlavorsJarTask(project,androidPlugin,flavor)
                 createFlavorsProguardTask(project,flavor)
                 createCopyBaseProjectTask(project,flavor)
+                createCopyEngineJarProguardMappingTask(project,flavor)
                 createCopyEngineJarTask(project,flavor)
                 createWebkitCorePalmZipTask(project,flavor)
                 createBuildEngineZipTask(project,flavor)
@@ -115,6 +116,17 @@ public class AppCanPlugin implements Plugin<Project> {
         task.from("build/outputs/jar/AppCanEngine-${name}-${version}.jar","src/${name}/libs/")
 
         task.into("$BUILD_APPCAN_DIR/$name/en_baseEngineProject/WebkitCorePalm/libs")
+
+        task.dependsOn(project.tasks.findByName("copy${name.capitalize()}EngineJarProguardMapping"))
+    }
+
+    /**
+     * 拷贝引擎jar混淆后的mapping文件到引擎zip根目录
+     */
+    private void createCopyEngineJarProguardMappingTask(Project project, String name){
+        def task=project.tasks.create("copy${name.capitalize()}EngineJarProguardMapping", Copy)
+        task.from("build/outputs/mapping/mapping.txt")
+        task.into("$BUILD_APPCAN_DIR/$name/en_baseEngineProject/mapping")
         task.dependsOn(project.tasks.findByName("copy${name.capitalize()}Project"))
     }
 
@@ -136,8 +148,15 @@ public class AppCanPlugin implements Plugin<Project> {
     private void createBuildEngineZipTask(Project project, String name){
         def task=project.tasks.create("build${name.capitalize()}Engine",Zip)
         task.from("$BUILD_APPCAN_DIR/$name/en_baseEngineProject/${getPackageName(name)}",
-                "$BUILD_APPCAN_DIR/$name/en_baseEngineProject/androidEngine.xml")
+                "$BUILD_APPCAN_DIR/$name/en_baseEngineProject/androidEngine.xml", "$BUILD_APPCAN_DIR/$name/en_baseEngineProject/mapping/mapping.txt")
         task.into("")
+        task.rename { fileName ->
+            if(fileName == "mapping.txt"){
+                return "mapping-${getPackageName(name)}.txt"
+            }else{
+                return null
+            }
+        }
         task.exclude("$BUILD_APPCAN_DIR/$name/en_baseEngineProject/WebkitCorePalm")
         task.destinationDir=project.file("build/outputs/engine")
         task.baseName=getPackageName(name)
@@ -153,7 +172,7 @@ public class AppCanPlugin implements Plugin<Project> {
     /**
      * 获取package name
      */
-    private String getPackageName(String flavor){
+    private static String getPackageName(String flavor){
         def date = new Date().format("yyMMdd")
         def versionTemp=version
         def buildVersionTemp = buildVersion
@@ -283,6 +302,10 @@ public class AppCanPlugin implements Plugin<Project> {
         proguardTask.libraryjars(androidJarDir)
         proguardTask.libraryjars("libs")
         proguardTask.libraryjars("src/${name}/libs")
+        new File('build/outputs/mapping').mkdirs()
+        def mappingFile = "build/outputs/mapping/mapping.txt"
+        proguardTask.printmapping("${mappingFile}")
+        println("proguardTask.printmapping===>"+mappingFile)
         proguardTask.configuration('proguard.pro')
         flavors.add(name)
         flavorsProguardTask.add(proguardTask)
