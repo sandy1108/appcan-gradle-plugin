@@ -7,6 +7,14 @@ apply plugin: 'groovy'
 
 
 
+task clean(type: Delete) {
+    delete 'build'
+}
+
+dependencies {
+    compile gradleApi()
+    compile localGroovy()
+}
 
 dependencies {
     compile fileTree(dir: 'libs', include: '*.jar')
