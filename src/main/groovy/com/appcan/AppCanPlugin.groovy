@@ -205,6 +205,10 @@ public class AppCanPlugin implements Plugin<Project> {
      */
     private String getEngineVersion(Project project){
         def versionFilePath = "src/main/java/org/zywx/wbpalmstar/base/BConstant.java"
+        if (!new File(versionFilePath).exists()){
+            //如果不存在，则为3.x引擎分支，在此做兼容
+            versionFilePath = "src/org/zywx/wbpalmstar/base/BConstant.java"
+        }
         def version=""
         Pattern p=Pattern.compile("ENGINE_VERSION=\"(.*?)\"")
         Matcher m=p.matcher(new File(project.getProjectDir(),versionFilePath).getText('UTF-8'))
