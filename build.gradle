@@ -5,7 +5,24 @@ repositories {
 
 apply plugin: 'groovy'
 
+apply plugin: 'maven'
 
+group='org.appcan.gradle.plugins'
+version='2.2.0'
+
+Properties properties = new Properties()
+InputStream inputStream = project.rootProject.file('local.properties').newDataInputStream() ;
+properties.load( inputStream )
+
+def maven_repo_dir = properties.getProperty('maven_repo_dir')
+
+uploadArchives {
+    repositories {
+        mavenDeployer {
+            repository(url: uri(maven_repo_dir))
+        }
+    }
+}
 
 task clean(type: Delete) {
     delete 'build'

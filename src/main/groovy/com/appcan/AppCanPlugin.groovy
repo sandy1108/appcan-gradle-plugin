@@ -41,28 +41,35 @@ public class AppCanPlugin implements Plugin<Project> {
         this.mProject=project;
         this.mExtension=project.extensions.create(PLUGIN_NAME,AppCanPluginExtension)
         project.afterEvaluate {
-            version=getEngineVersion(project)
-            buildVersion=getEngineLocalBuildVersionCode(version)
-            androidPlugin=getAndroidBasePlugin(project)
-            def variantManager=getVariantManager(androidPlugin)
-            processVariantData(variantManager.variantDataList,androidPlugin)
+            try {
+                version=getEngineVersion(project)
+                buildVersion=getEngineLocalBuildVersionCode(version)
+                androidPlugin=getAndroidBasePlugin(project)
+                def variantManager=getVariantManager(androidPlugin)
+                processVariantData(variantManager.variantDataList,androidPlugin)
 
-            createIncreaseEngineLocalBuildVersionCodeTask()
-            variantManager.getProductFlavors().keySet().each { flavor ->
-                createFlavorsJarTask(project,androidPlugin,flavor)
-                createFlavorsProguardTask(project,flavor)
-                createCopyBaseProjectTask(project,flavor)
-                createCopyEngineJarProguardMappingTask(project,flavor)
-                createCopyEngineJarTask(project,flavor)
-                createWebkitCorePalmZipTask(project,flavor)
-                createBuildEngineZipTask(project,flavor)
-                createFlavorsCopyAarTask(flavor)
-                createFlavorsBuildAarTask(flavor)
+                createIncreaseEngineLocalBuildVersionCodeTask()
+                variantManager.getProductFlavors().keySet().each { flavor ->
+                    println("apply appcan each flavor===> " + flavor)
+                    createFlavorsJarTask(project,androidPlugin,flavor)
+                    createFlavorsProguardTask(project,flavor)
+                    createCopyBaseProjectTask(project,flavor)
+                    createCopyEngineJarProguardMappingTask(project,flavor)
+                    createCopyEngineJarTask(project,flavor)
+                    createWebkitCorePalmZipTask(project,flavor)
+                    createBuildEngineZipTask(project,flavor)
+                    createFlavorsCopyAarTask(flavor)
+                    createFlavorsBuildAarTask(flavor)
+                }
+                createJarTask(project)
+                createProguardJarTask(project)
+                createBuildEngineTask()
+                createBuildAarTask(project)
+            } catch (e) {
+                println("apply appcan error！！！")
+                println("如果您是在Run到手机中出现的这个错误，则不必理会，这是由于高版本Gradle针对高版本Android系统进行的Instant Run优化，buildEngine Task应该不会有这个错误。或者您可以选择关闭Instant Run功能防止这个错误。")
+                //e.printStackTrace()
             }
-            createJarTask(project)
-            createProguardJarTask(project)
-            createBuildEngineTask()
-            createBuildAarTask(project)
         }
 
     }
@@ -279,6 +286,13 @@ public class AppCanPlugin implements Plugin<Project> {
         if (applicationId!=null) {
             jarEngineTask.exclude(applicationId.replace('.', '/'))
         }
+//        project.tasks.each {
+//            eachTask ->
+//                println("appcan apply eachTask===>"+eachTask)
+//        }
+//        Task temp = project.tasks.findByName("compile${name.capitalize()}ReleaseSources")
+//        println("appcan apply jarEngineTask==>"+jarEngineTask)
+//        println("appcan apply compile${name.capitalize()}ReleaseSources==>"+temp)
         jarEngineTask.dependsOn(project.tasks.findByName("compile${name.capitalize()}ReleaseSources"))
         flavorsJarTask.add(jarEngineTask)
     }
