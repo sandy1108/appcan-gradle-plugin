@@ -1,6 +1,7 @@
 
 repositories {
     jcenter()
+//    google()
 }
 
 apply plugin: 'groovy'
@@ -8,7 +9,7 @@ apply plugin: 'groovy'
 apply plugin: 'maven'
 
 group='org.appcan.gradle.plugins'
-version='2.2.0'
+version='2.2.3'
 
 Properties properties = new Properties()
 InputStream inputStream = project.rootProject.file('local.properties').newDataInputStream() ;
@@ -24,7 +25,7 @@ uploadArchives {
     }
 }
 
-task clean(type: Delete) {
+task clearBuild(type: Delete) {
     delete 'build'
 }
 

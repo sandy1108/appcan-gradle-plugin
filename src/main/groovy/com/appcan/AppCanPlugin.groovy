@@ -132,7 +132,7 @@ public class AppCanPlugin implements Plugin<Project> {
      */
     private void createCopyEngineJarProguardMappingTask(Project project, String name){
         def task=project.tasks.create("copy${name.capitalize()}EngineJarProguardMapping", Copy)
-        task.from("build/outputs/mapping/mapping.txt")
+        task.from("build/outputs/mapping/mapping-${name.capitalize()}.txt")
         task.into("$BUILD_APPCAN_DIR/$name/en_baseEngineProject/mapping")
         task.dependsOn(project.tasks.findByName("copy${name.capitalize()}Project"))
     }
@@ -155,10 +155,10 @@ public class AppCanPlugin implements Plugin<Project> {
     private void createBuildEngineZipTask(Project project, String name){
         def task=project.tasks.create("build${name.capitalize()}Engine",Zip)
         task.from("$BUILD_APPCAN_DIR/$name/en_baseEngineProject/${getPackageName(name)}",
-                "$BUILD_APPCAN_DIR/$name/en_baseEngineProject/androidEngine.xml", "$BUILD_APPCAN_DIR/$name/en_baseEngineProject/mapping/mapping.txt")
+                "$BUILD_APPCAN_DIR/$name/en_baseEngineProject/androidEngine.xml", "$BUILD_APPCAN_DIR/$name/en_baseEngineProject/mapping/mapping-${name.capitalize()}.txt")
         task.into("")
         task.rename { fileName ->
-            if(fileName == "mapping.txt"){
+            if(fileName == "mapping-${name.capitalize()}.txt"){
                 return "mapping-${getPackageName(name)}.txt"
             }else{
                 return null
@@ -317,7 +317,7 @@ public class AppCanPlugin implements Plugin<Project> {
         proguardTask.libraryjars("libs")
         proguardTask.libraryjars("src/${name}/libs")
         new File('build/outputs/mapping').mkdirs()
-        def mappingFile = "build/outputs/mapping/mapping.txt"
+        def mappingFile = "build/outputs/mapping/mapping-${name.capitalize()}.txt"
         proguardTask.printmapping("${mappingFile}")
         println("proguardTask.printmapping===>"+mappingFile)
         proguardTask.configuration('proguard.pro')
