@@ -33,6 +33,7 @@ public class AppCanPlugin implements Plugin<Project> {
     List<String> flavors=new ArrayList<String>()
     static final String BUILD_APPCAN_DIR ="build/appcan"
     public static String version=""
+    public static String versionToday=""
     public static String buildVersion="01"
     static boolean isVersionUpdated = false //用于标记在本次编译过程中，版本号是否已经+1
 
@@ -42,8 +43,10 @@ public class AppCanPlugin implements Plugin<Project> {
         this.mExtension=project.extensions.create(PLUGIN_NAME,AppCanPluginExtension)
         project.afterEvaluate {
             try {
+                def dateToday = new Date().format("yyMMdd")
                 version=getEngineVersion(project)
-                buildVersion=getEngineLocalBuildVersionCode(version)
+                versionToday="${version}_${dateToday}"
+                buildVersion=getEngineLocalBuildVersionCode(versionToday)
                 androidPlugin=getAndroidBasePlugin(project)
                 def variantManager=getVariantManager(androidPlugin)
                 processVariantData(variantManager.variantDataList,androidPlugin)
@@ -435,7 +438,7 @@ public class AppCanPlugin implements Plugin<Project> {
         def versionTaskName = "doIncreaseEngineLocalBuildVersionCode"
         def versionTask = mProject.tasks.create(versionTaskName)
         versionTask.doLast {
-            increaseEngineLocalBuildVersionCode(version)
+            increaseEngineLocalBuildVersionCode(versionToday)
         }
         mProject.tasks.create("preventIncreaseEngineLocalBuildVersionCode").doLast {
             isVersionUpdated = true
