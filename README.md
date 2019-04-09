@@ -4,6 +4,14 @@ export engine
 
 # changelog
 
+- 2.2.4 
+
+记录build号的key增加日期的区分（每天从01开始）
+
+- 2.2.3 
+
+修复mapping文件没有区分内核的问题
+
 - 2.2.0 
 
 修复开启InstantRun时无法Run到手机中调试Engine的问题
