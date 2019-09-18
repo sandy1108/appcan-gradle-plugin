@@ -11,6 +11,7 @@
 # Generated files
 bin/
 gen/
+out/
 
 # Gradle files
 .gradle/
@@ -33,5 +34,14 @@ captures/
 
 # Android Studio Configs
 .idea/
+*.iml
 
-.gradle/
+### AndroidStudio Patch ###
+
+!/gradle/wrapper/gradle-wrapper.jar
+
+# Legacy Eclipse project files
+.classpath
+.project
+.cproject
+.settings/
