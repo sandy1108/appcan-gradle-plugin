@@ -1,8 +1,40 @@
 # appcan-gradle-plugin
 
-export engine
+用于Android AppCanEngine自动化出包。
 
-# changelog
+## 使用示例代码
+
+1. Gradle依赖配置
+
+```groovy
+buildscript {
+    repositories {
+        maven {
+            url 'https://raw.githubusercontent.com/android-plugin/mvn-repo/master/'
+        }
+    }
+    dependencies {
+        classpath 'org.appcan.gradle.plugins:appcan-gradle-plugin:2.2.4'
+    }
+}
+```
+
+2. gradle.properties可选参数配置示例
+
+```properties
+### 是否开启debug日志，默认false，留空或者移除即可
+appcan.engine.package.debug=false
+### 出包时是否增加后缀，默认情况下不需要，留空或者移除即可
+appcan.engine.package.version.suffix=beta
+```
+
+## changelog
+
+- 2.3.1
+
+1. 适配Gradle5.4.1和AndroidGradleBuildTools3.5.0
+2. 该版本可能无法向前兼容低版本gradle（因为API有变动），如有旧版本Gradle需要，请使用2.2.x版本。
+3. 增加在gradle.properties中配置appcan.engine.package.debug和appcan.engine.package.version.suffix
 
 - 2.2.4 
 

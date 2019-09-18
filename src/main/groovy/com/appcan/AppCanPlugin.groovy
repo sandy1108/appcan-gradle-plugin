@@ -6,8 +6,8 @@ import com.android.build.gradle.internal.variant.BaseVariantData
 import com.android.builder.model.SourceProvider
 import com.android.utils.FileUtils
 import net.koiosmedia.gradle.sevenzip.SevenZip
+import org.apache.http.util.TextUtils
 import org.codehaus.groovy.runtime.ResourceGroovyMethods
-import org.gradle.api.GradleException
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
@@ -26,7 +26,7 @@ public class AppCanPlugin implements Plugin<Project> {
     static final String PLUGIN_NAME = "appcan"
     static final VERSION_PROPERTIES_FILE_NAME = 'local-appcanengine-build-versions.properties'
     Project mProject;
-    AppCanPluginExtension mExtension;
+    AppCanExtension mExtension;
     BasePlugin androidPlugin
     List<Task> flavorsJarTask=new ArrayList<Task>()
     List<Task> flavorsProguardTask=new ArrayList<Task>()
@@ -35,13 +35,16 @@ public class AppCanPlugin implements Plugin<Project> {
     public static String version=""
     public static String versionToday=""
     public static String buildVersion="01"
+    public static String versionSuffix=""
     static boolean isVersionUpdated = false //用于标记在本次编译过程中，版本号是否已经+1
 
     @Override
     public void apply(Project project) {
         this.mProject=project;
-        this.mExtension=project.extensions.create(PLUGIN_NAME,AppCanPluginExtension)
+        this.mExtension=project.extensions.create(PLUGIN_NAME,AppCanExtension)
         project.afterEvaluate {
+            boolean isDebugMode = getEnginePackageDebugMode(project)
+            versionSuffix = getEnginePackageVersionSuffix(project)
             try {
                 def dateToday = new Date().format("yyMMdd")
                 version=getEngineVersion(project)
@@ -70,8 +73,10 @@ public class AppCanPlugin implements Plugin<Project> {
                 createBuildAarTask(project)
             } catch (e) {
                 println("apply appcan error！！！")
-                println("如果您是在Run到手机中出现的这个错误，则不必理会，这是由于高版本Gradle针对高版本Android系统进行的Instant Run优化，buildEngine Task应该不会有这个错误。或者您可以选择关闭Instant Run功能防止这个错误。")
-                //e.printStackTrace()
+                println("如果您是在Run到手机中出现的这个错误，则不必理会，这是由于某些版本Gradle针对高版本Android系统进行的Instant Run优化，buildEngine Task应该不会有这个错误。或者您可以选择关闭Instant Run功能防止这个错误。")
+                if (isDebugMode) {
+                    e.printStackTrace()
+                }
             }
         }
 
@@ -187,6 +192,9 @@ public class AppCanPlugin implements Plugin<Project> {
         def versionTemp=version
         def buildVersionTemp = buildVersion
         def enginePackageName = "android_Engine_${versionTemp}_${date}_${buildVersionTemp}_${flavor}"
+        if (!TextUtils.isEmpty(versionSuffix)) {
+            enginePackageName = "${enginePackageName}_$versionSuffix"
+        }
         println("getEnginePackageName: ${enginePackageName}")
         return enginePackageName
     }
@@ -199,6 +207,9 @@ public class AppCanPlugin implements Plugin<Project> {
         def versionTemp=version.substring(0,version.lastIndexOf("."))
         def buildVersionTemp = buildVersion;
         def engineZipVersion = "sdksuit_${versionTemp}_${date}_${buildVersionTemp}"
+        if (!TextUtils.isEmpty(versionSuffix)) {
+            engineZipVersion = "${engineZipVersion}_$versionSuffix"
+        }
         println("getEngineZipVersion: ${engineZipVersion}")
         return engineZipVersion
     }
@@ -281,7 +292,9 @@ public class AppCanPlugin implements Plugin<Project> {
         jarEngineTask.setBaseName(jarBaseName)
         jarEngineTask.description="build $name Engine jar"
         jarEngineTask.destinationDir=project.file("build/outputs/jar")
-        jarEngineTask.from("build/intermediates/classes/$name/release/")
+//        jarEngineTask.from("build/intermediates/classes/$name/release/")
+        jarEngineTask.from("build/intermediates/javac/${name}Release/classes/")
+        println("jarEngineTask.from $name")
         jarEngineTask.into("")
         jarEngineTask.exclude('**/R.class')
         jarEngineTask.exclude('**/R\$*.class')
@@ -328,15 +341,14 @@ public class AppCanPlugin implements Plugin<Project> {
         flavorsProguardTask.add(proguardTask)
     }
 
-    private void processVariantData(
-            List<BaseVariantData<? extends BaseVariantData>> variantDataList, BasePlugin androidPlugin) {
+    private void processVariantData(List<BaseVariantData> variantDataList, BasePlugin androidPlugin) {
 
         variantDataList.each { variantData ->
             def variantDataName = variantData.name
 
             def javaTask = getJavaTask(variantData)
             if (javaTask == null) {
-                project.logger.info("javaTask is missing for $variantDataName, so Groovy files won't be compiled for it")
+                mProject.logger.info("javaTask is missing for $variantDataName, so Groovy files won't be compiled for it")
                 return
             }
             def providers = variantData.variantConfiguration.sortedSourceProviders
@@ -448,6 +460,32 @@ public class AppCanPlugin implements Plugin<Project> {
             isVersionUpdated = false
             println("continueIncreaseEngineLocalBuildVersionCode")
         }
+    }
+
+    def static getEnginePackageDebugMode(Project project){
+        boolean isDebugMode = false
+        try {
+            String result = project.property("appcan.engine.package.debug")
+            isDebugMode = Boolean.parseBoolean(result)
+        } catch (e) {
+            println("gradle.properties 中未指定DebugMode或格式错误，默认关闭。")
+//            e.printStackTrace()
+        }
+        println("getEnginePackageDebugMode: ${isDebugMode}")
+        return isDebugMode
+    }
+
+    def static getEnginePackageVersionSuffix(Project project){
+        String versionSuffix = ""
+        try {
+            String result = project.property("appcan.engine.package.version.suffix")
+            versionSuffix = result
+        } catch (e) {
+            println("gradle.properties 中未指定引擎版本号后缀，默认无后缀。")
+//            e.printStackTrace()
+        }
+        println("getEnginePackageVersionSuffix: ${versionSuffix}")
+        return versionSuffix
     }
 
     def static getEngineLocalBuildVersionCode(String engineVersion) {

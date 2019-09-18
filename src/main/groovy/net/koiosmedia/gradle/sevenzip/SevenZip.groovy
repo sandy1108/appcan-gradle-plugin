@@ -3,10 +3,10 @@ package net.koiosmedia.gradle.sevenzip
 import org.gradle.api.Project
 import org.gradle.api.internal.file.copy.CopyAction
 import org.gradle.api.internal.file.copy.CopyActionProcessingStream
-import org.gradle.api.internal.tasks.SimpleWorkResult
 import org.gradle.api.tasks.AbstractCopyTask
 import org.gradle.api.tasks.WorkResult
 import org.gradle.api.tasks.bundling.AbstractArchiveTask
+import org.gradle.workers.internal.DefaultWorkResult
 
 class SevenZip extends AbstractArchiveTask {
 
@@ -21,15 +21,15 @@ class SevenZip extends AbstractArchiveTask {
             this.project=project
 			this.archiveFile=archiveFile;
 		}
-		
+
 		@Override
 		public WorkResult execute(final CopyActionProcessingStream stream) {
             com.swemel.sevenzip.SevenZip sevenZip =
 				new com.swemel.sevenzip.SevenZip(archiveFile.getAbsolutePath(),toFileArray(mFiles));
 			sevenZip.createArchive();
-			return new SimpleWorkResult(true);
+			return new DefaultWorkResult(true, new Exception("SevenZip.groovy exception"));
 		}
-		
+
 
 	}
 
@@ -66,6 +66,6 @@ class SevenZip extends AbstractArchiveTask {
 	
 	@Override
 	protected CopyAction createCopyAction() {
-		return new SevenZipCopyAction(project,getArchivePath());
+		return new SevenZipCopyAction(project,getArchiveFile().get().getAsFile());
 	}
 }
