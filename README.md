@@ -24,11 +24,18 @@ buildscript {
 ```properties
 ### 是否开启debug日志，默认false，留空或者移除即可
 appcan.engine.package.debug=false
+### 出包时是否需要禁用混淆功能（如混淆出现错误，或者不需要混淆功能，可以启用为true，否则默认false。）
+appcan.engine.package.disable_proguard=false
 ### 出包时是否增加后缀，默认情况下不需要，留空或者移除即可
 appcan.engine.package.version.suffix=beta
 ```
 
 ## changelog
+
+- 2.4.0
+
+1. 增加在gradle.properties中配置appcan.engine.package.disable_proguard，来控制引擎出包的混淆代码的开关。
+
 
 - 2.3.1
 

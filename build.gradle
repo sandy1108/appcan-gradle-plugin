@@ -9,7 +9,7 @@ apply plugin: 'groovy'
 apply plugin: 'maven'
 
 group='org.appcan.gradle.plugins'
-version='2.3.1'
+version='2.4.0'
 
 Properties properties = new Properties()
 InputStream inputStream = project.rootProject.file('local.properties').newDataInputStream() ;
