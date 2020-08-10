@@ -36,6 +36,7 @@ public class AppCanPlugin implements Plugin<Project> {
     public static String versionToday=""
     public static String buildVersion="01"
     public static String versionSuffix=""
+    static boolean isProguardDisabled = false // 用于记录是否需要关闭混淆
     static boolean isVersionUpdated = false //用于标记在本次编译过程中，版本号是否已经+1
 
     @Override
@@ -44,6 +45,7 @@ public class AppCanPlugin implements Plugin<Project> {
         this.mExtension=project.extensions.create(PLUGIN_NAME,AppCanExtension)
         project.afterEvaluate {
             boolean isDebugMode = getEnginePackageDebugMode(project)
+            isProguardDisabled = getEnginePackageDisableProguard(project)
             versionSuffix = getEnginePackageVersionSuffix(project)
             try {
                 def dateToday = new Date().format("yyMMdd")
@@ -120,7 +122,13 @@ public class AppCanPlugin implements Plugin<Project> {
         def task=project.tasks.create("copy${name.capitalize()}Project",Copy)
         task.from("../en_baseEngineProject")
         task.into("$BUILD_APPCAN_DIR/$name/en_baseEngineProject")
-        task.dependsOn(project.tasks.findByName("build${name.capitalize()}Jar"))
+        if (isProguardDisabled){
+            // 如果禁用了混淆，则直接跳过混淆步骤
+            task.dependsOn(project.tasks.findByName("build${name.capitalize()}JarTemp"))
+        }else{
+            // 正常启用混淆
+            task.dependsOn(project.tasks.findByName("build${name.capitalize()}Jar"))
+        }
     }
 
     /**
@@ -128,10 +136,14 @@ public class AppCanPlugin implements Plugin<Project> {
      */
     private static void createCopyEngineJarTask(Project project, String name){
         def task=project.tasks.create("copy${name.capitalize()}EngineJar",Copy)
-        task.from("build/outputs/jar/AppCanEngine-${name}-${version}.jar","src/${name}/libs/")
-
+        if (isProguardDisabled){
+            // 禁用了混淆，jar包需要改名
+            task.from("build/outputs/jar/AppCanEngine-${name}-unprog-${version}.jar","src/${name}/libs/")
+        }else{
+            // 启用混淆的情况，正常逻辑
+            task.from("build/outputs/jar/AppCanEngine-${name}-${version}.jar","src/${name}/libs/")
+        }
         task.into("$BUILD_APPCAN_DIR/$name/en_baseEngineProject/WebkitCorePalm/libs")
-
         task.dependsOn(project.tasks.findByName("copy${name.capitalize()}EngineJarProguardMapping"))
     }
 
@@ -286,7 +298,7 @@ public class AppCanPlugin implements Plugin<Project> {
      * 对每个flavor创建Task生成不混淆的jar
      **/
     private void createFlavorsJarTask(Project project, BasePlugin androidPlugin, def name){
-        def jarBaseName="AppCanEngine-${name}-un-proguard"
+        def jarBaseName="AppCanEngine-${name}-unprog-${version}"
         def applicationId=androidPlugin.extension.defaultConfig.applicationId;
         def jarEngineTask = project.tasks.create("build${name.capitalize()}JarTemp",Jar)
         jarEngineTask.setBaseName(jarBaseName)
@@ -327,7 +339,7 @@ public class AppCanPlugin implements Plugin<Project> {
         def androidJarDir = androidSDKDir.toString() + '/platforms/' + androidPlugin.extension.getCompileSdkVersion() +
                 '/android.jar'
 
-        proguardTask.injars("build/outputs/jar/AppCanEngine-${name}-un-proguard.jar")
+        proguardTask.injars("build/outputs/jar/AppCanEngine-${name}-unprog-${version}.jar")
         proguardTask.outjars("build/outputs/jar/AppCanEngine-${name}-${version}.jar")
         proguardTask.libraryjars(androidJarDir)
         proguardTask.libraryjars("libs")
@@ -473,6 +485,19 @@ public class AppCanPlugin implements Plugin<Project> {
         }
         println("getEnginePackageDebugMode: ${isDebugMode}")
         return isDebugMode
+    }
+
+    def static getEnginePackageDisableProguard(Project project){
+        boolean isDisableProguard = false
+        try {
+            String result = project.property("appcan.engine.package.disable_proguard")
+            isDisableProguard = Boolean.parseBoolean(result)
+        } catch (e) {
+            println("gradle.properties 中未指定isDisableProguard或格式错误，默认关闭。")
+//            e.printStackTrace()
+        }
+        println("getEnginePackageDisableProguard: ${isDisableProguard}")
+        return isDisableProguard
     }
 
     def static getEnginePackageVersionSuffix(Project project){
