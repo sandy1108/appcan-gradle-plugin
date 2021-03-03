@@ -32,6 +32,10 @@ appcan.engine.package.version.suffix=beta
 
 ## changelog
 
+- 2.5.0
+
+1. 适配Gradle6.5和AndroidGradleBuildTools4.1.2
+
 - 2.4.0
 
 1. 增加在gradle.properties中配置appcan.engine.package.disable_proguard，来控制引擎出包的混淆代码的开关。
