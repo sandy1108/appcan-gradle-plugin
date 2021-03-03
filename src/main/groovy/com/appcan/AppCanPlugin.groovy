@@ -1,9 +1,10 @@
 package com.appcan
 
-import com.android.build.gradle.BasePlugin
+
 import com.android.build.gradle.internal.VariantManager
+import com.android.build.gradle.internal.plugins.BasePlugin
 import com.android.build.gradle.internal.variant.BaseVariantData
-import com.android.builder.model.SourceProvider
+import com.android.build.gradle.internal.variant.ComponentInfo
 import com.android.utils.FileUtils
 import net.koiosmedia.gradle.sevenzip.SevenZip
 import org.apache.http.util.TextUtils
@@ -11,6 +12,7 @@ import org.codehaus.groovy.runtime.ResourceGroovyMethods
 import org.gradle.api.Plugin
 import org.gradle.api.Project
 import org.gradle.api.Task
+import org.gradle.api.plugins.PluginCollection
 import org.gradle.api.tasks.Copy
 import org.gradle.api.tasks.SourceTask
 import org.gradle.api.tasks.bundling.Jar
@@ -43,6 +45,7 @@ public class AppCanPlugin implements Plugin<Project> {
     public void apply(Project project) {
         this.mProject=project;
         this.mExtension=project.extensions.create(PLUGIN_NAME,AppCanExtension)
+        flavors.clear() // 清空之前的flavors缓存记录
         project.afterEvaluate {
             boolean isDebugMode = getEnginePackageDebugMode(project)
             isProguardDisabled = getEnginePackageDisableProguard(project)
@@ -53,11 +56,12 @@ public class AppCanPlugin implements Plugin<Project> {
                 versionToday="${version}_${dateToday}"
                 buildVersion=getEngineLocalBuildVersionCode(versionToday)
                 androidPlugin=getAndroidBasePlugin(project)
-                def variantManager=getVariantManager(androidPlugin)
-                processVariantData(variantManager.variantDataList,androidPlugin)
-
+                // 预先遍历所有的flavor并缓存
+                processVariantData(androidPlugin)
+                // 引擎版本号自增长Task
                 createIncreaseEngineLocalBuildVersionCodeTask()
-                variantManager.getProductFlavors().keySet().each { flavor ->
+                // 为每一个flavor创建引擎打包Task
+                flavors.each { flavor ->
                     println("apply appcan each flavor===> " + flavor)
                     createFlavorsJarTask(project,androidPlugin,flavor)
                     createFlavorsProguardTask(project,flavor)
@@ -349,25 +353,19 @@ public class AppCanPlugin implements Plugin<Project> {
         proguardTask.printmapping("${mappingFile}")
         println("proguardTask.printmapping===>"+mappingFile)
         proguardTask.configuration('proguard.pro')
-        flavors.add(name)
         flavorsProguardTask.add(proguardTask)
     }
 
-    private void processVariantData(List<BaseVariantData> variantDataList, BasePlugin androidPlugin) {
-
-        variantDataList.each { variantData ->
-            def variantDataName = variantData.name
-
-            def javaTask = getJavaTask(variantData)
-            if (javaTask == null) {
-                mProject.logger.info("javaTask is missing for $variantDataName, so Groovy files won't be compiled for it")
-                return
+    // 解析每个variant
+    private void processVariantData(BasePlugin androidPlugin) {
+        def variantManager = getVariantManager(androidPlugin)
+        List<ComponentInfo> variantComponentList = variantManager.getMainComponents()
+        variantComponentList.each { componentInfo ->
+            String flavorName = componentInfo.getVariant().flavorName;
+            if (!flavors.contains(flavorName)){
+                flavors.add(flavorName)
+                println("processVariantData===>find flavor: " + flavorName)
             }
-            def providers = variantData.variantConfiguration.sortedSourceProviders
-            providers.each { SourceProvider provider ->
-
-            }
-
         }
     }
 
@@ -381,10 +379,17 @@ public class AppCanPlugin implements Plugin<Project> {
     }
 
     private static BasePlugin getAndroidBasePlugin(Project project) {
-        def plugin = project.plugins.findPlugin('android') ?:
-                project.plugins.findPlugin('android-library')
-
-        return plugin as BasePlugin
+        PluginCollection collection = project.plugins.withType(BasePlugin.class)
+        def basePlugin
+        collection.each{ it ->
+            basePlugin = it as BasePlugin
+            println("getAndroidBasePlugin===>find Android BasePlugin: " + basePlugin)
+        }
+        if (basePlugin == null){
+            throw new Exception("This is probably not an Android Project. AppCanPlugin is stopped.")
+        }else{
+            return basePlugin
+        }
     }
 
 
